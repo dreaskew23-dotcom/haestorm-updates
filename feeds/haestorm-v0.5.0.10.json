@@ -1,0 +1,39 @@
+{
+  "version": "0.5.0.10",
+  "mode": "patches",
+  "workerVersion": "v0.5.0.3-radio-text-fix",
+  "requiresFullServerRestart": false,
+  "patches": [
+    {
+      "target": "resource",
+      "resource": "haestorm-ai-dispatch",
+      "path": "server/main.lua",
+      "beforeSha256": "474073819e3344645918cb7a5bb9c8fed3b0ff690cb59aef0c08dc03093db804",
+      "afterSha256": "926efe6320cc98e03251181bf341b0c5feabba812d5e416ea1b1622776cada1b",
+      "replacements": [
+        {
+          "old": "    local detailWord = t:find('wearing',1,true) or t:find('hoodie',1,true) or t:find('shirt',1,true)\n        or t:find('pants',1,true) or t:find('jeans',1,true) or t:find('shorts',1,true)\n        or t:find('jacket',1,true) or t:find('hat',1,true) or t:find('shoes',1,true)\n        or t:find('tall',1,true) or t:find('short',1,true) or t:find('heavy',1,true)\n    local vehicleWord = t:find('vehicle',1,true) or t:find('car ',1,true) or t:find('truck',1,true)\n        or t:find('plate',1,true) or t:find('driver',1,true) or t:find('occupant',1,true)\n    if personWord and detailWord and not vehicleWord then return true end\n",
+          "new": "    local detailWord = t:find('wearing',1,true) or t:find('hoodie',1,true) or t:find('shirt',1,true)\n        or t:find('pants',1,true) or t:find('jeans',1,true) or t:find('shorts',1,true)\n        or t:find('jacket',1,true) or t:find('hat',1,true) or t:find('shoes',1,true)\n        or t:find('tall',1,true) or t:find('short',1,true) or t:find('heavy',1,true)\n    local vehicleWord = t:find('vehicle',1,true) or t:find('car ',1,true) or t:find('truck',1,true)\n        or t:find('plate',1,true) or t:find('driver',1,true) or t:find('occupant',1,true)\n    if personWord and detailWord and not vehicleWord then return true end\n    -- Once dispatch is already on a subject stop, \"... is wearing ...\" is a\n    -- person description even when Whisper mangles the first word (for example\n    -- \"Now is wearing...\"). Vehicle words still block this recovery path.\n    if t:find('wearing',1,true) and detailWord and not vehicleWord then return true end\n"
+        },
+        {
+          "old": "    if normalized ~= original and Config.ResponseDebug ~= false then\n        print(('[AI response debug] %s'):format(json.encode({\n            stage='transcript_normalized', original=original, normalized=normalized,\n            unitStatus=status ~= '' and status or nil, time=os.time()\n        })))\n    end\n",
+          "new": "    -- Whisper can occasionally loop a short high-salience phrase for the rest\n    -- of one capture. Collapse repeated \"shots fired\" hallucinations to a single\n    -- actionable transmission; the emergency meaning is unchanged.\n    local lowerNormalized = normalized:lower()\n    local shotCount, pos = 0, 1\n    while true do\n        local a, b = lowerNormalized:find('shots fired', pos, true)\n        if not a then break end\n        shotCount = shotCount + 1\n        pos = b + 1\n        if shotCount >= 3 then break end\n    end\n    if shotCount >= 3 then normalized = 'Shots fired.' end\n\n    if normalized ~= original and Config.ResponseDebug ~= false then\n        print(('[AI response debug] %s'):format(json.encode({\n            stage='transcript_normalized', original=original, normalized=normalized,\n            unitStatus=status ~= '' and status or nil, time=os.time()\n        })))\n    end\n"
+        },
+        {
+          "old": "    local l, s = lane(u), state(u)\n    -- If dispatch just asked for a plate, the next transmission may be only the\n",
+          "new": "    local l, s = lane(u), state(u)\n\n    -- In an active emergency, a clipped \"resume\" means release emergency radio\n    -- traffic while keeping the unit on its current incident. \"Resume ... 10-8\"\n    -- still follows the existing RESUME_AIR_AVAILABLE path.\n    if s.status == 'EMERGENCY' and r.intent == 'UNKNOWN' then\n        local compactResume = DispatcherIntent.normalize(tostring(text or ''))\n        if compactResume == 'resume' or compactResume == 'resume traffic' or compactResume == 'resume normal traffic' then\n            r = { intent='RESUME_AIR', confidence=1, text=compactResume }\n            understandingLog('emergency_control_context', u, text, r, 'clipped resume recovered during active emergency')\n        end\n    end\n\n    -- If dispatch just asked for a plate, the next transmission may be only the\n"
+        }
+      ]
+    }
+  ],
+  "fullFiles": [
+    {
+      "target": "resource",
+      "resource": "haestorm-ai-dispatch",
+      "path": "server/main.lua",
+      "sha256": "926efe6320cc98e03251181bf341b0c5feabba812d5e416ea1b1622776cada1b",
+      "url": "https://raw.githubusercontent.com/dreaskew23-dotcom/haestorm-updates/main/payloads/v0.5.0.10/haestorm-ai-dispatch/server/main.lua"
+    }
+  ],
+  "description": "Haestorm v0.5.0.10 reliability polish: recovers mangled clothing-description openings during subject stops, collapses repeated shots-fired STT hallucinations to one emergency transmission, and treats clipped 'resume' as emergency-air release. No full server restart."
+}
