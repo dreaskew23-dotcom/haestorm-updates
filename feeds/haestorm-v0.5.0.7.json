@@ -22,7 +22,7 @@
     },
     {
       "target": "resource",
-      "resource": "[standalone]\\haestorm-ai-dispatch",
+      "resource": "haestorm-ai-dispatch",
       "path": "server/main.lua",
       "beforeSha256": "cb9b8302d31ceb11be1df420125a9645375be95889e2e7ca0029f4d54d90c8e3",
       "afterSha256": "440ce2851ef7d2be47c380226a8edd097559304f178d49b16b7dcb2f175a93b1",
@@ -63,7 +63,7 @@
     },
     {
       "target": "resource",
-      "resource": "[standalone]\\haestorm-ai-worker-bootstrap",
+      "resource": "haestorm-ai-worker-bootstrap",
       "path": "server.js",
       "beforeSha256": "ee35520bfa51f70c5e3ccd0b2e5162730c12e3c9927884dad9725af2f4112f9c",
       "afterSha256": "43e37e6a53dac61af0d9d8dd624b4dc1bf34758735062d1c8ee30fb1bccd2fab",
@@ -77,23 +77,7 @@
           "new": "  });\n}\n\nasync function waitForWorker(timeoutMs) {\n  const deadline = Date.now() + timeoutMs;\n  while (Date.now() < deadline) {\n    if (await isListening(WORKER_PORT, 1200)) return true;\n    await new Promise(r => setTimeout(r, 1500));\n  }\n  return false;\n}\n\nasync function launchWorker(reason) {\n  if (launchCycle) return launchCycle;\n  const now = Date.now();\n  if (now < nextAllowedAttemptAt) return false;\n\n  const dir = workerPath();\n  if (!dir) {\n    if (!missingPathWarned) {\n      console.error(`[${RESOURCE}] ai_dispatch_worker_path is not set. Add the worker path to server.cfg.`);\n      missingPathWarned = true;\n    }\n    return false;\n  }\n\n  launchCycle = (async () => {\n    lastAttemptAt = Date.now();\n    nextAllowedAttemptAt = lastAttemptAt + RETRY_BACKOFF_MS;\n    const script = path.join(dir, 'restart-worker.ps1');\n    console.log(`[${RESOURCE}] Worker offline (${reason}); starting one AI dispatch worker launch cycle...`);\n\n    try {\n      const child = spawn('powershell.exe', [\n        '-NoProfile',\n        '-ExecutionPolicy', 'Bypass',\n        '-File', script\n      ], {\n        cwd: dir,\n        windowsHide: true,\n        detached: true,\n        stdio: 'ignore'\n      });\n\n      child.once('error', (err) => {\n        console.error(`[${RESOURCE}] Worker launch failed: ${err && err.message ? err.message : err}`);\n        console.error(`[${RESOURCE}] Confirm server.cfg contains: add_unsafe_child_process_permission \"${RESOURCE}\"`);\n      });\n      child.unref();\n    } catch (err) {\n      console.error(`[${RESOURCE}] Failed to launch worker: ${err && err.message ? err.message : err}`);\n      console.error(`[${RESOURCE}] Confirm server.cfg contains: add_unsafe_child_process_permission \"${RESOURCE}\"`);\n      return false;\n    }\n\n    const up = await waitForWorker(START_TIMEOUT_MS);\n    if (up) {\n      console.log(`[${RESOURCE}] Worker is online on 127.0.0.1:${WORKER_PORT}; launch cycle complete.`);\n      nextAllowedAttemptAt = 0;\n      return true;\n    }\n\n    console.error(`[${RESOURCE}] Worker did not become ready within ${Math.round(START_TIMEOUT_MS/1000)}s. Next retry is backoff-controlled.`);\n    return false;\n  })();\n\n  try { return await launchCycle; }\n  finally { launchCycle = null; }\n}\n\nasync function checkWorker(reason) {\n  try {\n    if (await isListening(WORKER_PORT)) return true;\n    if (startupSettling) return false;\n    return await launchWorker(reason);\n  } catch (err) {\n    console.error(`[${RESOURCE}] Worker health check failed: ${err && err.message ? err.message : err}`);\n    return false;\n  }\n}\n\nfunction scheduleCheck(reason, delayMs) {\n  setTimeout(() => {\n    checkWorker(reason).catch((err) => {\n      console.error(`[${RESOURCE}] Watchdog check failed: ${err && err.message ? err.message : err}`);\n    });\n  }, delayMs);\n}\n\n// Give the normal server/worker startup path time to settle before the watchdog tries to help.\nsetTimeout(() => {\n  startupSettling = false;\n  checkWorker('server startup').catch(() => {});\n}, STARTUP_SETTLE_MS);\n\nsetInterval(() => {\n  checkWorker('health watchdog').catch((err) => {\n    console.error(`[${RESOURCE}] Watchdog check failed: ${err && err.message ? err.message : err}`);\n  });\n}, CHECK_MS);\n\non('onResourceStart', (name) => {\n  if (name === 'tRadio' || name === 'haestorm-ai-dispatch') {\n    scheduleCheck(`${name} started`, Math.max(3000, STARTUP_SETTLE_MS));\n  }\n});\n\nconsole.log(`[${RESOURCE}] v0.5.0.7 active; single-launch watchdog, ${Math.round(STARTUP_SETTLE_MS/1000)}s startup settle, ${Math.round(START_TIMEOUT_MS/1000)}s launch timeout.`);\n"
         }
       ]
-    },
-    {
-      "target": "resource",
-      "resource": "haestorm-ai-dispatch",
-      "path": "server/main.lua",
-      "beforeSha256": "2809007bb26100e0d9b51df695d55a055699d1ce479399ab27f6819712d45e14",
-      "afterSha256": "2809007bb26100e0d9b51df695d55a055699d1ce479399ab27f6819712d45e14",
-      "replacements": []
-    },
-    {
-      "target": "resource",
-      "resource": "haestorm-ai-worker-bootstrap",
-      "path": "server.js",
-      "beforeSha256": "dbb997a9cf12b1ce788b0971351e1eea14e844b858d7d639ac0f9003647f61c7",
-      "afterSha256": "dbb997a9cf12b1ce788b0971351e1eea14e844b858d7d639ac0f9003647f61c7",
-      "replacements": []
     }
   ],
-  "description": "Fix live resource selection and dispatcher radio language: SUBJECT_STOP on live resource, realistic hails/acks, Disreg shorthand, natural 10-6 busy traffic, no-additional negative backup handling, and current bootstrap watchdog/label. No full server restart. Hybrid updater now cache-busts the remote manifest request to prevent stale GitHub raw/CDN feed reads."
+  "description": "Haestorm v0.5.0.7: fixes live resource selection, cache-busts future feed checks, restores SUBJECT_STOP on the real live dispatcher, adds realistic hails/acks, Disreg shorthand, natural 10-6 busy traffic, negative/no-additional handling, and updates the live bootstrap watchdog/label. No full server restart."
 }
