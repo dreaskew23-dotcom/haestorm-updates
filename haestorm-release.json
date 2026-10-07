@@ -1,7 +1,59 @@
 {
   "version": "0.5.0.6",
-  "url": "https://raw.githubusercontent.com/dreaskew23-dotcom/haestorm-updates/main/releases/haestorm-v0.5.0.6.zip",
-  "sha256": "04fdfcea7ab8c6f69277234a728d10521f33136a586bd20489613e9e3d60cff5",
+  "mode": "patches",
+  "url": "https://raw.githubusercontent.com/dreaskew23-dotcom/haestorm-updates/main/releases/haestorm-v0.5.0.5.zip",
+  "sha256": "952dea9a378debb1a9cddf5dcf11ae85a70c57d97796e134b1526e88a22b5c2a",
   "workerVersion": "v0.5.0.3-radio-text-fix",
-  "requiresFullServerRestart": false
+  "requiresFullServerRestart": false,
+  "updaterVersion": "4.0",
+  "patches": [
+    {
+      "target": "resource",
+      "resource": "haestorm-ai-dispatch",
+      "path": "server/main.lua",
+      "beforeSha256": "70cbe1974043e95566bc5ebc4bae7cd668a533391d00837e0ba00a759ca40ca7",
+      "afterSha256": "2809007bb26100e0d9b51df695d55a055699d1ce479399ab27f6819712d45e14",
+      "replacements": [
+        {
+          "old": "end\n\nlocal function process(u, r)\n    local s, l = state(u), lane(u)\n",
+          "new": "end\n\n-- v0.5.0.6 realistic dispatcher hails:\n-- Rotate concise radio responses and use the unit's current context when it is\n-- already committed to a stop/call. This keeps the dispatcher natural without\n-- becoming chatty or inventing details.\nlocal function realisticHail(s)\n    local key, list\n    if s and s.stop then\n        key = 'HAIL_TRAFFIC'\n        list = { 'go ahead with your traffic.', 'go ahead, what do you have?', 'send your traffic.' }\n    elseif s and (s.callId or s.status == 'RESPONDING' or s.status == 'ON_SCENE' or s.incidentMode) then\n        key = 'HAIL_UPDATE'\n        list = { 'go ahead with your update.', 'go ahead.', 'send it.' }\n    else\n        key = 'HAIL_GENERAL'\n        list = { 'go ahead.', 'send it.', 'go for dispatch.', \"I'm listening.\" }\n    end\n    replyCursor[key] = (replyCursor[key] or 0) % #list + 1\n    return list[replyCursor[key]]\nend\n\nlocal function process(u, r)\n    local s, l = state(u), lane(u)\n"
+        },
+        {
+          "old": "        finish(u); return\n    end\n    if r.intent == 'HAIL' then reply(u, variant('HAIL', 'go ahead.')); return end\n    if r.text == 'status okay' or r.text == 'all okay' or r.text == 'code 4' then s.activity = os.time(); s.welfare = nil; reply(u, variant('COPY', 'copy.')); finish(u); return end\n    if r.intent == 'QUERY' then\n",
+          "new": "        finish(u); return\n    end\n    if r.intent == 'HAIL' then reply(u, realisticHail(s)); return end\n    if r.text == 'status okay' or r.text == 'all okay' or r.text == 'code 4' then s.activity = os.time(); s.welfare = nil; reply(u, variant('COPY', 'copy.')); finish(u); return end\n    if r.intent == 'QUERY' then\n"
+        },
+        {
+          "old": "        or status == 'ON_SCENE' or status == 'TRAFFIC_STOP'\n\n    -- High-confidence phrasing can always be corrected.\n    normalized = normalized:gsub('([Ss]how me)%s+[Tt]onight', '%1 10-8')\n",
+          "new": "        or status == 'ON_SCENE' or status == 'TRAFFIC_STOP'\n\n    local compactOriginal = DispatcherIntent.normalize(original)\n    -- Whisper occasionally hears a one-word radio hail of \"Dispatch\" as\n    -- \"Internet\". Only correct the standalone word; never rewrite normal\n    -- sentences that legitimately contain \"internet\".\n    if compactOriginal == 'internet' then\n        normalized = 'Dispatch.'\n    end\n\n    -- High-confidence phrasing can always be corrected.\n    normalized = normalized:gsub('([Ss]how me)%s+[Tt]onight', '%1 10-8')\n"
+        },
+        {
+          "old": "        local subjectStop = parseSubjectStopTraffic(text)\n        if subjectStop then r = subjectStop end\n    end\n    if Config.UnderstandingDebug then\n",
+          "new": "        local subjectStop = parseSubjectStopTraffic(text)\n        if subjectStop then r = subjectStop end\n    end\n    if r.intent == 'UNKNOWN' then\n        local ackText = DispatcherIntent.normalize(text)\n        local naturalAck = {\n            ['copy']=true, ['copy that']=true, ['received']=true, ['roger']=true,\n            ['roger that']=true, ['understood']=true, ['affirm']=true, ['affirmative']=true\n        }\n        if naturalAck[ackText] then\n            r = { intent='ACK', confidence=1, text=ackText }\n        end\n    end\n    if Config.UnderstandingDebug then\n"
+        },
+        {
+          "old": "        if not enabled or mode ~= 'ai' or voiceGeneration ~= generation or not current or current.cid ~= cid or current.sign ~= sign or current.channel ~= u.channel or (not priorityUnit and l.active ~= src) then return false end\n        local candidate = ok and type(response) == 'table' and response.ok and response.result\n        local allowed = {EMERGENCY_UPDATE=true,RADIO_CHECK=true,HAIL=true,RESPONDING=true,ON_SCENE=true,AVAILABLE=true,BUSY=true,UNAVAILABLE=true,TRAFFIC_STOP=true,TRANSPORTING=true,BACKUP=true,CLEAR=true,EMERGENCY=true,QUERY=true,NEGATED=true,CANCEL=true,CANCEL_LAST_TRAFFIC=true,CANCEL_CALL=true,CANCEL_BACKUP=true,END_EMERGENCY=true,HOLD_AIR=true,RESUME_AIR=true,RESUME_AIR_AVAILABLE=true,PLATE=true,PLATE_REQUEST=true,TRAFFIC_STOP_UPDATE=true,NO_PLATE=true,INCIDENT_UPDATE=true,SUBJECT_STOP=true}\n        if type(candidate) ~= 'table' or not allowed[candidate.intent] or type(candidate.confidence) ~= 'number' or candidate.confidence < Config.SemanticConfidence or candidate.confidence > 1 then\n            understandingLog('semantic_rejected', u, text, r, { ok = ok, responseOk = type(response) == 'table' and response.ok or false, candidate = candidate })\n",
+          "new": "        if not enabled or mode ~= 'ai' or voiceGeneration ~= generation or not current or current.cid ~= cid or current.sign ~= sign or current.channel ~= u.channel or (not priorityUnit and l.active ~= src) then return false end\n        local candidate = ok and type(response) == 'table' and response.ok and response.result\n        local allowed = {EMERGENCY_UPDATE=true,RADIO_CHECK=true,HAIL=true,RESPONDING=true,ON_SCENE=true,AVAILABLE=true,BUSY=true,UNAVAILABLE=true,TRAFFIC_STOP=true,TRANSPORTING=true,BACKUP=true,CLEAR=true,EMERGENCY=true,QUERY=true,NEGATED=true,CANCEL=true,CANCEL_LAST_TRAFFIC=true,CANCEL_CALL=true,CANCEL_BACKUP=true,END_EMERGENCY=true,HOLD_AIR=true,RESUME_AIR=true,RESUME_AIR_AVAILABLE=true,PLATE=true,PLATE_REQUEST=true,TRAFFIC_STOP_UPDATE=true,NO_PLATE=true,INCIDENT_UPDATE=true,SUBJECT_STOP=true,ACK=true}\n        if type(candidate) ~= 'table' or not allowed[candidate.intent] or type(candidate.confidence) ~= 'number' or candidate.confidence < Config.SemanticConfidence or candidate.confidence > 1 then\n            understandingLog('semantic_rejected', u, text, r, { ok = ok, responseOk = type(response) == 'table' and response.ok or false, candidate = candidate })\n"
+        }
+      ]
+    },
+    {
+      "target": "resource",
+      "resource": "haestorm-ai-worker-bootstrap",
+      "path": "server.js",
+      "beforeSha256": "c2331ab090787a881171b045cec5d71564d7724867f5ac958437ea5113dbad30",
+      "afterSha256": "dbb997a9cf12b1ce788b0971351e1eea14e844b858d7d639ac0f9003647f61c7",
+      "replacements": [
+        {
+          "old": "v0.5.0.5 active",
+          "new": "v0.5.0.6 active"
+        }
+      ]
+    }
+  ],
+  "restartOrder": [
+    "haestorm-ai-worker-bootstrap",
+    "haestorm-ai-dispatch"
+  ],
+  "description": "Hybrid direct-patch release: realistic context-aware dispatch hails, silent natural acknowledgements, narrow standalone Internet-to-Dispatch STT correction, and bootstrap label cleanup. If the live base differs, Hybrid v4 automatically restores verified v0.5.0.5 and retries the patch in the same run.",
+  "fallbackBaseVersion": "0.5.0.5"
 }
