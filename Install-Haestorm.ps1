@@ -1,6 +1,6 @@
 # Haestorm one-command first-time installer.
 # EDIT ONLY THIS LINE BEFORE UPLOADING TO GITHUB:
-$ManifestUrl = 'https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/haestorm-updates/main/latest.json'
+$ManifestUrl = 'https://raw.githubusercontent.com/dreaskew23-dotcom/haestorm-updates/main/latest.json'
 
 $ErrorActionPreference = 'Stop'
 function Step($m){Write-Host "[Haestorm] $m" -ForegroundColor Cyan}
