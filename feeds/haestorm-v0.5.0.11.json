@@ -1,0 +1,47 @@
+{
+  "version": "0.5.0.11",
+  "mode": "patches",
+  "workerVersion": "v0.5.0.3-radio-text-fix",
+  "requiresFullServerRestart": false,
+  "patches": [
+    {
+      "target": "resource",
+      "resource": "haestorm-ai-dispatch",
+      "path": "server/main.lua",
+      "beforeSha256": "926efe6320cc98e03251181bf341b0c5feabba812d5e416ea1b1622776cada1b",
+      "afterSha256": "7d1cd089e453f48c821baddad349a3cc09e70a98345fd85ea75e3476a49c777c",
+      "replacements": [
+        {
+          "old": "local function realisticHail(s)\n    local key, list\n    if s and s.stop then\n        key = 'HAIL_TRAFFIC'\n        list = { 'go ahead with your traffic.', 'go ahead, what do you have?', 'send your traffic.' }\n    elseif s and (s.callId or s.status == 'RESPONDING' or s.status == 'ON_SCENE' or s.incidentMode) then\n        key = 'HAIL_UPDATE'\n        list = { 'go ahead with your update.', 'go ahead.', 'send it.' }\n    else\n        key = 'HAIL_GENERAL'\n        list = { 'go ahead.', 'send it.', 'go for dispatch.', \"I'm listening.\" }\n    end\n    replyCursor[key] = (replyCursor[key] or 0) % #list + 1\n    return list[replyCursor[key]]\nend",
+          "new": "local function realisticHail(s)\n    local key, list\n    if s and s.stop then\n        key = 'HAIL_TRAFFIC'\n        list = { 'go ahead.', 'send your traffic.', 'go ahead with traffic.' }\n    elseif s and (s.callId or s.status == 'RESPONDING' or s.status == 'ON_SCENE' or s.incidentMode) then\n        key = 'HAIL_UPDATE'\n        list = { 'go ahead.', 'send the update.', 'send it.' }\n    else\n        key = 'HAIL_GENERAL'\n        list = { 'go ahead.', 'send it.', 'go ahead.' }\n    end\n    replyCursor[key] = (replyCursor[key] or 0) % #list + 1\n    return list[replyCursor[key]]\nend"
+        },
+        {
+          "old": "        if not next(l.emergency) then\n            if hadEmergency then reply(u, '10-4. Emergency traffic clear. Show you 10-8.', true)\n            else reply(u, '10-4. The air is clear. Show you 10-8.', false) end\n        else\n            reply(u, '10-4. Your emergency traffic is clear. Show you 10-8. Hold the air for the remaining emergency traffic.', true)\n        end",
+          "new": "        if not next(l.emergency) then\n            if hadEmergency then reply(u, 'copy. Emergency traffic clear. 10-8.', true)\n            else reply(u, 'copy. Air is clear. 10-8.', false) end\n        else\n            reply(u, 'copy. You are 10-8. Hold the air for remaining emergency traffic.', true)\n        end"
+        },
+        {
+          "old": "        if not next(l.emergency) then\n            if hadEmergency then reply(u, '10-4. Emergency traffic clear. All units, resume normal traffic.', true)\n            else reply(u, '10-4. The air is already clear.', false) end\n        else reply(u, '10-4. Your emergency traffic is clear. Hold the air for the remaining emergency traffic.', true) end\n        finish(u); return\n    end\n    if r.intent == 'HOLD_AIR' then reply(u, '10-4. All units, hold routine traffic.', true); return end",
+          "new": "        if not next(l.emergency) then\n            if hadEmergency then reply(u, 'copy. All units, emergency traffic clear. Resume normal traffic.', true)\n            else reply(u, 'copy. Air is clear.', false) end\n        else reply(u, 'copy. Hold the air for remaining emergency traffic.', true) end\n        finish(u); return\n    end\n    if r.intent == 'HOLD_AIR' then reply(u, 'all units, hold the air. Emergency traffic only.', true); return end"
+        },
+        {
+          "old": "    if officerDown then\n        reply(u, 'officer down. Emergency traffic only. All available units respond. Advise exact location and officer status.', true)\n    elseif t:find('shots fired', 1, true) or t:find('shots being fired', 1, true) then\n        reply(u, 'shots fired. Emergency traffic only. All available units start that way. Advise your status.', true)",
+          "new": "    if officerDown then\n        reply(u, 'officer down. Hold the air. All units start that way. Advise location.', true)\n    elseif t:find('shots fired', 1, true) or t:find('shots being fired', 1, true) then\n        reply(u, 'shots fired. Hold the air. Units start that way. Advise status.', true)"
+        },
+        {
+          "old": "                if not s.welfare then\n                    s.welfare = now; s.welfareStage = 1\n                    local msg = s.status == 'TRAFFIC_STOP' and 'status?' or (s.status == 'EMERGENCY' and 'you code 4?' or 'status?')\n                    reply(u, msg, s.status == 'EMERGENCY')\n                elseif s.welfare > 0 and s.welfareStage == 1 and now - s.welfare > Config.WelfareResponseSeconds then\n                    s.welfare = now; s.welfareStage = 2\n                    reply(u, 'second call, advise status.', true)\n                elseif s.welfare > 0 and s.welfareStage == 2 and now - s.welfare > Config.WelfareEscalationSeconds then\n                    reply(u, 'no response. Available unit or supervisor, check this unit.', true); s.welfare = -1; s.welfareStage = 3\n                end",
+          "new": "                if not s.welfare then\n                    s.welfare = now; s.welfareStage = 1\n                    local msg = s.status == 'EMERGENCY' and 'advise status.' or 'status check.'\n                    reply(u, msg, s.status == 'EMERGENCY')\n                elseif s.welfare > 0 and s.welfareStage == 1 and now - s.welfare > Config.WelfareResponseSeconds then\n                    s.welfare = now; s.welfareStage = 2\n                    reply(u, 'second call. Advise status.', true)\n                elseif s.welfare > 0 and s.welfareStage == 2 and now - s.welfare > Config.WelfareEscalationSeconds then\n                    reply(u, 'no response. Any available unit, start toward last known.', true); s.welfare = -1; s.welfareStage = 3\n                end"
+        }
+      ]
+    }
+  ],
+  "fullFiles": [
+    {
+      "target": "resource",
+      "resource": "haestorm-ai-dispatch",
+      "path": "server/main.lua",
+      "sha256": "7d1cd089e453f48c821baddad349a3cc09e70a98345fd85ea75e3476a49c777c",
+      "url": "https://raw.githubusercontent.com/dreaskew23-dotcom/haestorm-updates/main/payloads/v0.5.0.11/haestorm-ai-dispatch/server/main.lua"
+    }
+  ],
+  "description": "Haestorm v0.5.0.11 realistic dispatcher voice: removes AI-style phrasing, shortens routine and emergency radio traffic, uses realistic status checks, and tightens emergency clear/hold-air wording. No full server restart."
+}
