@@ -1,10 +1,32 @@
 $ErrorActionPreference='Stop'
+$SelfUrl='https://raw.githubusercontent.com/dreaskew23-dotcom/haestorm-updates/main/recovery/v0.5.0.7.ps1?elevated=1'
 $Updater='C:\Haestorm\Updater\Update-Haestorm.ps1'
 $Config='C:\Haestorm\Updater\config.json'
 $Target='94cecf68b79823c1090791aba64330025fc1248a87c2a7b2693d5ff6942d7662'
 $Base='d169dfe78bc9037a2f3c40599ad55bb99f92ba95115ae0600e6c0af9c51391ce'
 $PathOnly='3c4b142af86d15e6585373e2c5b011880c1a8499075d287c0865e41c7589b34c'
 $Backup="$Updater.before-v0507-recovery"
+
+function Test-Admin {
+    $id=[Security.Principal.WindowsIdentity]::GetCurrent()
+    $p=New-Object Security.Principal.WindowsPrincipal($id)
+    return $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+if(-not (Test-Admin)){
+    $tmp=Join-Path $env:TEMP 'haestorm-v0507-recovery.ps1'
+    Invoke-WebRequest -UseBasicParsing -Uri $SelfUrl -OutFile $tmp
+    Write-Host '[Haestorm] Administrator permission is required. Approve the UAC prompt.' -ForegroundColor Yellow
+    $args=@("-NoProfile","-ExecutionPolicy","Bypass","-File",$tmp)
+    $proc=Start-Process powershell.exe -Verb RunAs -Wait -PassThru -ArgumentList $args
+    exit $proc.ExitCode
+}
+
+Write-Host '[Haestorm] Repairing Hybrid updater permissions' -ForegroundColor Cyan
+attrib -R $Updater 2>$null
+& takeown.exe /F $Updater /A | Out-Null
+& icacls.exe $Updater /grant '*S-1-5-32-544:F' /C | Out-Null
+if($LASTEXITCODE -ne 0){ throw 'Could not grant Administrators full control over the updater.' }
 
 $OldFind=@'
 function Find-Dest([string]$name){
@@ -14,6 +36,7 @@ function Find-Dest([string]$name){
     if($found){ return $found.FullName }
     return Join-Path $resourceRoot $name
 }
+
 '@
 $NewFind=@'
 function Find-Dest([string]$name){
@@ -47,6 +70,7 @@ function Find-Dest([string]$name){
     if($found){ return $found.FullName }
     return Join-Path $resourceRoot $name
 }
+
 '@
 $OldFeed=@'
 function Get-RemoteFeed {
@@ -59,6 +83,7 @@ function Get-RemoteFeed {
         return $null
     }
 }
+
 '@
 $NewFeed=@'
 function Get-RemoteFeed {
@@ -75,6 +100,7 @@ function Get-RemoteFeed {
         return $null
     }
 }
+
 '@
 
 $h=(Get-FileHash -Algorithm SHA256 -LiteralPath $Updater).Hash.ToLowerInvariant()
@@ -94,14 +120,17 @@ if($h -ne $Target){
         Copy-Item -LiteralPath $Backup -Destination $Updater -Force
         throw "Updater recovery hash mismatch: $h2"
     }
-    Write-Host '[OK] Hybrid updater recovery installed.' -ForegroundColor Green
+    Write-Host '[OK] Hybrid updater v4 path + cache fixes installed.' -ForegroundColor Green
+}else{
+    Write-Host '[OK] Hybrid updater v4 fixes already installed.' -ForegroundColor Green
 }
 
 $c=Get-Content -LiteralPath $Config -Raw | ConvertFrom-Json
 $oldUrl=[string]$c.manifestUrl
 try {
-    $c.manifestUrl='https://raw.githubusercontent.com/dreaskew23-dotcom/haestorm-updates/main/feeds/haestorm-v0.5.0.7.json?recovery=1'
+    $c.manifestUrl='https://raw.githubusercontent.com/dreaskew23-dotcom/haestorm-updates/main/feeds/haestorm-v0.5.0.7.json?recovery=2'
     [IO.File]::WriteAllText($Config,($c|ConvertTo-Json -Depth 20),(New-Object Text.UTF8Encoding($false)))
+    Write-Host '[Haestorm] Applying v0.5.0.7 to the live resources' -ForegroundColor Cyan
     & 'C:\WINDOWS\haestorm-update.cmd'
     if($LASTEXITCODE -ne 0){ throw "haestorm-update exited with code $LASTEXITCODE" }
 }
@@ -109,3 +138,4 @@ finally {
     $c.manifestUrl=$oldUrl
     [IO.File]::WriteAllText($Config,($c|ConvertTo-Json -Depth 20),(New-Object Text.UTF8Encoding($false)))
 }
+Write-Host '[OK] Haestorm v0.5.0.7 recovery complete. Future updates use: haestorm-update' -ForegroundColor Green
