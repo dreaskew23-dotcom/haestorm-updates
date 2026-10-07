@@ -66,7 +66,7 @@
       "resource": "haestorm-ai-worker-bootstrap",
       "path": "server.js",
       "beforeSha256": "ee35520bfa51f70c5e3ccd0b2e5162730c12e3c9927884dad9725af2f4112f9c",
-      "afterSha256": "43e37e6a53dac61af0d9d8dd624b4dc1bf34758735062d1c8ee30fb1bccd2fab",
+      "afterSha256": "667cb33235abce219bc0894c28d643b05c38e2c3c9daaab316fdb944c0215387",
       "replacements": [
         {
           "old": "const RESOURCE = GetCurrentResourceName();\nconst WORKER_PORT = Number(GetConvar('ai_dispatch_worker_port', '8789')) || 8789;\nconst CHECK_MS = Math.max(15000, Number(GetConvar('ai_dispatch_worker_watch_ms', '30000')) || 30000);\nconst START_GRACE_MS = Math.max(5000, Number(GetConvar('ai_dispatch_worker_start_grace_ms', '12000')) || 12000);\n\nlet starting = false;\nlet lastStart = 0;\nlet missingPathWarned = false;\n\nfunction workerPath() {\n  // v0.5.0.1: Do not probe the filesystem from inside FXServer.\n  // Current Cfx sandboxing blocks the old fs.existsSync cross-resource scan.\n  return String(GetConvar('ai_dispatch_worker_path', '') || '').trim();\n}\n\n",
