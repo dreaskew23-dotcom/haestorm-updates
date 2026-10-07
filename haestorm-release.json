@@ -1,7 +1,7 @@
 {
-  "version": "0.5.0.5",
-  "url": "https://raw.githubusercontent.com/dreaskew23-dotcom/haestorm-updates/main/releases/haestorm-v0.5.0.5.zip",
-  "sha256": "952dea9a378debb1a9cddf5dcf11ae85a70c57d97796e134b1526e88a22b5c2a",
+  "version": "0.5.0.6",
+  "url": "https://raw.githubusercontent.com/dreaskew23-dotcom/haestorm-updates/main/releases/haestorm-v0.5.0.6.zip",
+  "sha256": "04fdfcea7ab8c6f69277234a728d10521f33136a586bd20489613e9e3d60cff5",
   "workerVersion": "v0.5.0.3-radio-text-fix",
   "requiresFullServerRestart": false
 }
