@@ -8,11 +8,15 @@
       "target": "updater",
       "path": "Update-Haestorm.ps1",
       "beforeSha256": "d169dfe78bc9037a2f3c40599ad55bb99f92ba95115ae0600e6c0af9c51391ce",
-      "afterSha256": "3c4b142af86d15e6585373e2c5b011880c1a8499075d287c0865e41c7589b34c",
+      "afterSha256": "94cecf68b79823c1090791aba64330025fc1248a87c2a7b2693d5ff6942d7662",
       "replacements": [
         {
           "old": "function Find-Dest([string]$name){\n    if($name -eq 'ai-dispatch-worker'){ return $workerPath }\n    $found=Get-ChildItem -LiteralPath $resourceRoot -Directory -Recurse -ErrorAction SilentlyContinue |\n        Where-Object Name -eq $name | Select-Object -First 1\n    if($found){ return $found.FullName }\n    return Join-Path $resourceRoot $name\n}\n",
           "new": "function Find-Dest([string]$name){\n    if($name -eq 'ai-dispatch-worker'){ return $workerPath }\n\n    # Explicit resource-relative paths are used for one-time migrations and are\n    # resolved directly instead of being confused with duplicate folder names.\n    if($name.Contains('\\') -or $name.Contains('/')){\n        return Join-Path $resourceRoot ($name.Replace('/','\\'))\n    }\n\n    # Prefer the normal FiveM live standalone group when it exists.\n    $preferred=Join-Path $resourceRoot ('[standalone]\\' + $name)\n    if(Test-Path -LiteralPath $preferred){ return $preferred }\n\n    $found=Get-ChildItem -LiteralPath $resourceRoot -Directory -Recurse -ErrorAction SilentlyContinue |\n        Where-Object {\n            $p=$_.FullName.ToLowerInvariant()\n            $_.Name -eq $name -and\n            $p -notlike '*\\test\\*' -and\n            $p -notlike '*\\haestorm-updates\\*' -and\n            $p -notlike '*\\staging\\*' -and\n            $p -notlike '*\\backup\\*' -and\n            $p -notlike '*\\backups\\*' -and\n            $p -notlike '*\\incoming\\*' -and\n            $p -notlike '*\\temp\\*'\n        } |\n        Sort-Object FullName |\n        Select-Object -First 1\n\n    if($found){ return $found.FullName }\n    return Join-Path $resourceRoot $name\n}\n"
+        },
+        {
+          "old": "function Get-RemoteFeed {\n    if(!$config.manifestUrl){ return $null }\n    Step 'Checking Haestorm release feed'\n    try {\n        return Invoke-RestMethod -Uri ([string]$config.manifestUrl) -UseBasicParsing -TimeoutSec 15\n    } catch {\n        WarnH \"Release feed unavailable: $($_.Exception.Message)\"\n        return $null\n    }\n}\n",
+          "new": "function Get-RemoteFeed {\n    if(!$config.manifestUrl){ return $null }\n    Step 'Checking Haestorm release feed'\n    try {\n        $base=[string]$config.manifestUrl\n        $sep=if($base.Contains('?')){ '&' } else { '?' }\n        $uri=$base + $sep + 'haestorm_cb=' + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()\n        $headers=@{ 'Cache-Control'='no-cache'; 'Pragma'='no-cache' }\n        return Invoke-RestMethod -Uri $uri -Headers $headers -UseBasicParsing -TimeoutSec 15\n    } catch {\n        WarnH \"Release feed unavailable: $($_.Exception.Message)\"\n        return $null\n    }\n}\n"
         }
       ]
     },
@@ -91,5 +95,5 @@
       "replacements": []
     }
   ],
-  "description": "Fix live resource selection and dispatcher radio language: SUBJECT_STOP on live resource, realistic hails/acks, Disreg shorthand, natural 10-6 busy traffic, no-additional negative backup handling, and current bootstrap watchdog/label. No full server restart."
+  "description": "Fix live resource selection and dispatcher radio language: SUBJECT_STOP on live resource, realistic hails/acks, Disreg shorthand, natural 10-6 busy traffic, no-additional negative backup handling, and current bootstrap watchdog/label. No full server restart. Hybrid updater now cache-busts the remote manifest request to prevent stale GitHub raw/CDN feed reads."
 }
