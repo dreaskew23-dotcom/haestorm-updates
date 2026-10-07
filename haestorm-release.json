@@ -1,6 +1,7 @@
 {
-  "version": "0.5.0.3",
-  "url": "https://github.com/dreaskew23-dotcom/haestorm-updates/releases/download/v0.5.0.3/Haestorm-v0.5.0.3-COMPLETE-PAYLOAD.zip",
+  "version": "0.5.0.4",
+  "url": "https://raw.githubusercontent.com/dreaskew23-dotcom/haestorm-updates/main/releases/haestorm-v0.5.0.4.zip",
+  "sha256": "ea0291c85eef575d9905d45d29f1abb12befa4edefe2c227ca4d3a1b0bb6da48",
   "workerVersion": "v0.5.0.3-radio-text-fix",
   "requiresFullServerRestart": false
 }
